@@ -2,7 +2,27 @@
 name = "querywise-mcp"
 version = "0.1.0"
 description = "MCP server (and CLI) for querying databases in natural language through a semantic layer"
+readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Cosmin Chauciuc", email = "cosmin.chauciuc@gmail.com" }]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "text-to-sql",
+    "semantic-layer",
+    "sqlite",
+    "llm",
+    "natural-language-query",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "mcp[cli]>=1.2",
     "typer>=0.12",
@@ -39,8 +59,13 @@ dev = [
 querywise = "querywise_mcp.cli:app"
 querywise-mcp = "querywise_mcp.server:main"
 
+[project.urls]
+Homepage = "https://github.com/kosminus/querywise-mcp"
+Repository = "https://github.com/kosminus/querywise-mcp"
+Issues = "https://github.com/kosminus/querywise-mcp/issues"
+
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
