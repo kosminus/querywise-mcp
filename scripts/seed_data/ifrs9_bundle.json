@@ -1,0 +1,656 @@
+{
+  "glossary": [
+    {
+      "term": "EAD",
+      "definition": "Exposure at Default - the total amount a bank is exposed to at the time of a borrower's default. This is the gross carrying amount for on-balance sheet items.",
+      "sql_expression": "exposures.ead",
+      "related_tables": [
+        "exposures"
+      ],
+      "related_columns": [
+        "exposures.ead"
+      ],
+      "examples": [
+        "SELECT SUM(ead) FROM exposures WHERE reporting_date = '2024-12-31'"
+      ]
+    },
+    {
+      "term": "PD",
+      "definition": "Probability of Default - the likelihood that a borrower will default on their obligations within a given time horizon (12 months for Stage 1, lifetime for Stage 2/3).",
+      "sql_expression": "ecl_provisions.pd",
+      "related_tables": [
+        "ecl_provisions"
+      ],
+      "related_columns": [
+        "ecl_provisions.pd"
+      ],
+      "examples": [
+        "SELECT AVG(pd) FROM ecl_provisions WHERE stage = 1"
+      ]
+    },
+    {
+      "term": "LGD",
+      "definition": "Loss Given Default - the percentage of exposure that is lost if a borrower defaults, after accounting for recoveries and collateral.",
+      "sql_expression": "ecl_provisions.lgd",
+      "related_tables": [
+        "ecl_provisions",
+        "collateral"
+      ],
+      "related_columns": [
+        "ecl_provisions.lgd"
+      ],
+      "examples": [
+        "SELECT AVG(lgd) FROM ecl_provisions WHERE stage = 3"
+      ]
+    },
+    {
+      "term": "ECL",
+      "definition": "Expected Credit Loss - the probability-weighted estimate of credit losses. Calculated as PD x LGD x EAD. Under IFRS 9, Stage 1 uses 12-month ECL while Stage 2 and 3 use lifetime ECL.",
+      "sql_expression": "ecl_provisions.ecl_lifetime",
+      "related_tables": [
+        "ecl_provisions",
+        "exposures"
+      ],
+      "related_columns": [
+        "ecl_provisions.ecl_12m",
+        "ecl_provisions.ecl_lifetime"
+      ],
+      "examples": [
+        "SELECT SUM(ecl_lifetime) FROM ecl_provisions",
+        "SELECT stage, SUM(ecl_lifetime) FROM ecl_provisions GROUP BY stage"
+      ]
+    },
+    {
+      "term": "Stage 1",
+      "definition": "Performing loans with no significant increase in credit risk since origination. Only 12-month ECL is recognised as a provision.",
+      "sql_expression": "exposures.stage = 1",
+      "related_tables": [
+        "exposures",
+        "ecl_provisions"
+      ],
+      "related_columns": [
+        "exposures.stage"
+      ],
+      "examples": [
+        "SELECT * FROM exposures WHERE stage = 1"
+      ]
+    },
+    {
+      "term": "Stage 2",
+      "definition": "Loans with a Significant Increase in Credit Risk (SICR) since origination but not yet credit-impaired. Lifetime ECL is recognised.",
+      "sql_expression": "exposures.stage = 2",
+      "related_tables": [
+        "exposures",
+        "ecl_provisions",
+        "staging_history"
+      ],
+      "related_columns": [
+        "exposures.stage"
+      ],
+      "examples": [
+        "SELECT * FROM exposures WHERE stage = 2"
+      ]
+    },
+    {
+      "term": "Stage 3",
+      "definition": "Credit-impaired (defaulted) loans. Lifetime ECL is recognised and interest revenue is calculated on the net carrying amount.",
+      "sql_expression": "exposures.stage = 3",
+      "related_tables": [
+        "exposures",
+        "ecl_provisions"
+      ],
+      "related_columns": [
+        "exposures.stage"
+      ],
+      "examples": [
+        "SELECT * FROM exposures WHERE stage = 3"
+      ]
+    },
+    {
+      "term": "SICR",
+      "definition": "Significant Increase in Credit Risk - the trigger for moving a loan from Stage 1 to Stage 2 under IFRS 9. Assessed using quantitative and qualitative criteria.",
+      "sql_expression": "staging_history.to_stage = 2",
+      "related_tables": [
+        "staging_history",
+        "exposures"
+      ],
+      "related_columns": [
+        "staging_history.to_stage",
+        "staging_history.reason"
+      ],
+      "examples": [
+        "SELECT * FROM staging_history WHERE to_stage = 2 AND reason = 'downgrade'"
+      ]
+    },
+    {
+      "term": "Coverage Ratio",
+      "definition": "The ratio of ECL provisions to total exposure (EAD). Indicates the level of provisioning relative to the outstanding loan book.",
+      "sql_expression": "SUM(ecl_provisions.ecl_lifetime) / SUM(exposures.ead)",
+      "related_tables": [
+        "ecl_provisions",
+        "exposures"
+      ],
+      "related_columns": [
+        "ecl_provisions.ecl_lifetime",
+        "exposures.ead"
+      ],
+      "examples": []
+    },
+    {
+      "term": "NPL",
+      "definition": "Non-Performing Loan - loans classified as Stage 3 (credit-impaired) under IFRS 9. These are loans where the borrower has defaulted or is unlikely to pay.",
+      "sql_expression": "exposures.stage = 3",
+      "related_tables": [
+        "exposures",
+        "counterparties"
+      ],
+      "related_columns": [
+        "exposures.stage",
+        "counterparties.is_defaulted"
+      ],
+      "examples": [
+        "SELECT COUNT(*) FROM exposures WHERE stage = 3",
+        "SELECT SUM(ead) FROM exposures WHERE stage = 3"
+      ]
+    }
+  ],
+  "metrics": [
+    {
+      "metric_name": "total_ecl",
+      "display_name": "Total ECL",
+      "description": "Total Expected Credit Loss across the entire portfolio",
+      "sql_expression": "SUM(ecl_provisions.ecl_lifetime)",
+      "aggregation_type": "sum",
+      "related_tables": [
+        "ecl_provisions"
+      ],
+      "dimensions": [
+        "stage",
+        "facility_type",
+        "segment",
+        "currency"
+      ]
+    },
+    {
+      "metric_name": "total_ead",
+      "display_name": "Total EAD",
+      "description": "Total Exposure at Default across the entire portfolio",
+      "sql_expression": "SUM(exposures.ead)",
+      "aggregation_type": "sum",
+      "related_tables": [
+        "exposures"
+      ],
+      "dimensions": [
+        "stage",
+        "facility_type",
+        "segment",
+        "currency"
+      ]
+    },
+    {
+      "metric_name": "coverage_ratio",
+      "display_name": "Coverage Ratio",
+      "description": "ECL as a percentage of total EAD — indicates provisioning adequacy",
+      "sql_expression": "SUM(ecl_provisions.ecl_lifetime) / NULLIF(SUM(exposures.ead), 0)",
+      "aggregation_type": "ratio",
+      "related_tables": [
+        "ecl_provisions",
+        "exposures"
+      ],
+      "dimensions": [
+        "stage",
+        "facility_type",
+        "segment"
+      ]
+    },
+    {
+      "metric_name": "stage1_exposure",
+      "display_name": "Stage 1 Exposure",
+      "description": "Total EAD for performing loans (Stage 1 — 12-month ECL)",
+      "sql_expression": "SUM(exposures.ead) FILTER (WHERE exposures.stage = 1)",
+      "aggregation_type": "sum",
+      "related_tables": [
+        "exposures"
+      ],
+      "dimensions": [
+        "facility_type",
+        "segment",
+        "currency"
+      ],
+      "filters": {
+        "stage": 1
+      }
+    },
+    {
+      "metric_name": "stage2_exposure",
+      "display_name": "Stage 2 Exposure",
+      "description": "Total EAD for SICR loans (Stage 2 — lifetime ECL)",
+      "sql_expression": "SUM(exposures.ead) FILTER (WHERE exposures.stage = 2)",
+      "aggregation_type": "sum",
+      "related_tables": [
+        "exposures"
+      ],
+      "dimensions": [
+        "facility_type",
+        "segment",
+        "currency"
+      ],
+      "filters": {
+        "stage": 2
+      }
+    },
+    {
+      "metric_name": "stage3_exposure",
+      "display_name": "Stage 3 Exposure",
+      "description": "Total EAD for credit-impaired loans (Stage 3 — lifetime ECL)",
+      "sql_expression": "SUM(exposures.ead) FILTER (WHERE exposures.stage = 3)",
+      "aggregation_type": "sum",
+      "related_tables": [
+        "exposures"
+      ],
+      "dimensions": [
+        "facility_type",
+        "segment",
+        "currency"
+      ],
+      "filters": {
+        "stage": 3
+      }
+    },
+    {
+      "metric_name": "average_pd",
+      "display_name": "Average PD",
+      "description": "Weighted average Probability of Default across the portfolio",
+      "sql_expression": "AVG(ecl_provisions.pd)",
+      "aggregation_type": "avg",
+      "related_tables": [
+        "ecl_provisions"
+      ],
+      "dimensions": [
+        "stage",
+        "facility_type",
+        "segment"
+      ]
+    },
+    {
+      "metric_name": "npl_ratio",
+      "display_name": "NPL Ratio",
+      "description": "Non-Performing Loan ratio — Stage 3 EAD as a percentage of total EAD",
+      "sql_expression": "SUM(exposures.ead) FILTER (WHERE exposures.stage = 3) / NULLIF(SUM(exposures.ead), 0)",
+      "aggregation_type": "ratio",
+      "related_tables": [
+        "exposures"
+      ],
+      "dimensions": [
+        "facility_type",
+        "segment",
+        "currency"
+      ]
+    }
+  ],
+  "dictionary": [
+    {
+      "table_name": "exposures",
+      "column_name": "stage",
+      "raw_value": "1",
+      "display_value": "Stage 1 - Performing",
+      "description": "No significant increase in credit risk; 12-month ECL",
+      "sort_order": 1
+    },
+    {
+      "table_name": "exposures",
+      "column_name": "stage",
+      "raw_value": "2",
+      "display_value": "Stage 2 - SICR",
+      "description": "Significant increase in credit risk; lifetime ECL",
+      "sort_order": 2
+    },
+    {
+      "table_name": "exposures",
+      "column_name": "stage",
+      "raw_value": "3",
+      "display_value": "Stage 3 - Credit-Impaired",
+      "description": "Credit-impaired / defaulted; lifetime ECL",
+      "sort_order": 3
+    },
+    {
+      "table_name": "facilities",
+      "column_name": "facility_type",
+      "raw_value": "mortgage",
+      "display_value": "Mortgage Loan",
+      "description": "Residential or commercial mortgage",
+      "sort_order": 1
+    },
+    {
+      "table_name": "facilities",
+      "column_name": "facility_type",
+      "raw_value": "corporate_loan",
+      "display_value": "Corporate Loan",
+      "description": "Term loan to a corporate entity",
+      "sort_order": 2
+    },
+    {
+      "table_name": "facilities",
+      "column_name": "facility_type",
+      "raw_value": "consumer_loan",
+      "display_value": "Consumer Loan",
+      "description": "Unsecured personal loan",
+      "sort_order": 3
+    },
+    {
+      "table_name": "facilities",
+      "column_name": "facility_type",
+      "raw_value": "credit_card",
+      "display_value": "Credit Card",
+      "description": "Revolving credit card facility",
+      "sort_order": 4
+    },
+    {
+      "table_name": "facilities",
+      "column_name": "facility_type",
+      "raw_value": "overdraft",
+      "display_value": "Overdraft",
+      "description": "Overdraft facility on current account",
+      "sort_order": 5
+    },
+    {
+      "table_name": "counterparties",
+      "column_name": "segment",
+      "raw_value": "retail",
+      "display_value": "Retail Banking",
+      "description": "Individual consumers and households",
+      "sort_order": 1
+    },
+    {
+      "table_name": "counterparties",
+      "column_name": "segment",
+      "raw_value": "corporate",
+      "display_value": "Corporate Banking",
+      "description": "Large corporate entities",
+      "sort_order": 2
+    },
+    {
+      "table_name": "counterparties",
+      "column_name": "segment",
+      "raw_value": "sme",
+      "display_value": "SME Banking",
+      "description": "Small and medium enterprises",
+      "sort_order": 3
+    },
+    {
+      "table_name": "collateral",
+      "column_name": "collateral_type",
+      "raw_value": "property",
+      "display_value": "Real Estate Property",
+      "description": "Residential or commercial real estate",
+      "sort_order": 1
+    },
+    {
+      "table_name": "collateral",
+      "column_name": "collateral_type",
+      "raw_value": "cash",
+      "display_value": "Cash Deposit",
+      "description": "Cash held as security",
+      "sort_order": 2
+    },
+    {
+      "table_name": "collateral",
+      "column_name": "collateral_type",
+      "raw_value": "guarantee",
+      "display_value": "Bank Guarantee",
+      "description": "Third-party bank guarantee",
+      "sort_order": 3
+    },
+    {
+      "table_name": "collateral",
+      "column_name": "collateral_type",
+      "raw_value": "securities",
+      "display_value": "Securities",
+      "description": "Bonds, equities, or other financial instruments",
+      "sort_order": 4
+    },
+    {
+      "table_name": "staging_history",
+      "column_name": "reason",
+      "raw_value": "origination",
+      "display_value": "New Origination",
+      "description": "Initial recognition at Stage 1",
+      "sort_order": 1
+    },
+    {
+      "table_name": "staging_history",
+      "column_name": "reason",
+      "raw_value": "upgrade",
+      "display_value": "Credit Improvement",
+      "description": "Upgrade due to improved credit quality",
+      "sort_order": 2
+    },
+    {
+      "table_name": "staging_history",
+      "column_name": "reason",
+      "raw_value": "downgrade",
+      "display_value": "Credit Deterioration",
+      "description": "Downgrade due to SICR or default triggers",
+      "sort_order": 3
+    },
+    {
+      "table_name": "staging_history",
+      "column_name": "reason",
+      "raw_value": "cure",
+      "display_value": "Return to Performing",
+      "description": "Recovery from impaired status",
+      "sort_order": 4
+    },
+    {
+      "table_name": "staging_history",
+      "column_name": "reason",
+      "raw_value": "default",
+      "display_value": "Default Event",
+      "description": "Borrower entered default",
+      "sort_order": 5
+    },
+    {
+      "table_name": "counterparties",
+      "column_name": "credit_rating",
+      "raw_value": "AAA",
+      "display_value": "AAA - Prime",
+      "description": "Highest credit quality; minimal default risk",
+      "sort_order": 1
+    },
+    {
+      "table_name": "counterparties",
+      "column_name": "credit_rating",
+      "raw_value": "AA",
+      "display_value": "AA - High Grade",
+      "description": "Very high credit quality; very low default risk",
+      "sort_order": 2
+    },
+    {
+      "table_name": "counterparties",
+      "column_name": "credit_rating",
+      "raw_value": "A",
+      "display_value": "A - Upper Medium",
+      "description": "High credit quality; low default risk",
+      "sort_order": 3
+    },
+    {
+      "table_name": "counterparties",
+      "column_name": "credit_rating",
+      "raw_value": "BBB",
+      "display_value": "BBB - Lower Medium",
+      "description": "Good credit quality; moderate default risk (investment grade floor)",
+      "sort_order": 4
+    },
+    {
+      "table_name": "counterparties",
+      "column_name": "credit_rating",
+      "raw_value": "BB",
+      "display_value": "BB - Speculative",
+      "description": "Speculative; substantial credit risk (sub-investment grade)",
+      "sort_order": 5
+    },
+    {
+      "table_name": "counterparties",
+      "column_name": "credit_rating",
+      "raw_value": "B",
+      "display_value": "B - Highly Speculative",
+      "description": "Highly speculative; high default risk",
+      "sort_order": 6
+    },
+    {
+      "table_name": "counterparties",
+      "column_name": "credit_rating",
+      "raw_value": "CCC",
+      "display_value": "CCC - Substantial Risk",
+      "description": "Very high credit risk; near default",
+      "sort_order": 7
+    },
+    {
+      "table_name": "counterparties",
+      "column_name": "is_defaulted",
+      "raw_value": "true",
+      "display_value": "Defaulted",
+      "description": "Counterparty has defaulted on obligations",
+      "sort_order": 1
+    },
+    {
+      "table_name": "counterparties",
+      "column_name": "is_defaulted",
+      "raw_value": "false",
+      "display_value": "Performing",
+      "description": "Counterparty is current on obligations",
+      "sort_order": 2
+    },
+    {
+      "table_name": "facilities",
+      "column_name": "currency",
+      "raw_value": "EUR",
+      "display_value": "Euro",
+      "description": "European single currency",
+      "sort_order": 1
+    },
+    {
+      "table_name": "facilities",
+      "column_name": "currency",
+      "raw_value": "USD",
+      "display_value": "US Dollar",
+      "description": "United States dollar",
+      "sort_order": 2
+    },
+    {
+      "table_name": "facilities",
+      "column_name": "currency",
+      "raw_value": "GBP",
+      "display_value": "British Pound",
+      "description": "British pound sterling",
+      "sort_order": 3
+    },
+    {
+      "table_name": "facilities",
+      "column_name": "is_revolving",
+      "raw_value": "true",
+      "display_value": "Revolving",
+      "description": "Revolving credit facility (e.g. credit card, overdraft) — can be drawn and repaid repeatedly",
+      "sort_order": 1
+    },
+    {
+      "table_name": "facilities",
+      "column_name": "is_revolving",
+      "raw_value": "false",
+      "display_value": "Term / Amortising",
+      "description": "Term facility with scheduled repayment (e.g. mortgage, term loan)",
+      "sort_order": 2
+    },
+    {
+      "table_name": "ecl_provisions",
+      "column_name": "stage",
+      "raw_value": "1",
+      "display_value": "Stage 1 - Performing",
+      "description": "No significant increase in credit risk; 12-month ECL",
+      "sort_order": 1
+    },
+    {
+      "table_name": "ecl_provisions",
+      "column_name": "stage",
+      "raw_value": "2",
+      "display_value": "Stage 2 - SICR",
+      "description": "Significant increase in credit risk; lifetime ECL",
+      "sort_order": 2
+    },
+    {
+      "table_name": "ecl_provisions",
+      "column_name": "stage",
+      "raw_value": "3",
+      "display_value": "Stage 3 - Credit-Impaired",
+      "description": "Credit-impaired / defaulted; lifetime ECL",
+      "sort_order": 3
+    },
+    {
+      "table_name": "staging_history",
+      "column_name": "from_stage",
+      "raw_value": "1",
+      "display_value": "Stage 1 - Performing",
+      "description": "No significant increase in credit risk",
+      "sort_order": 1
+    },
+    {
+      "table_name": "staging_history",
+      "column_name": "from_stage",
+      "raw_value": "2",
+      "display_value": "Stage 2 - SICR",
+      "description": "Significant increase in credit risk",
+      "sort_order": 2
+    },
+    {
+      "table_name": "staging_history",
+      "column_name": "from_stage",
+      "raw_value": "3",
+      "display_value": "Stage 3 - Credit-Impaired",
+      "description": "Credit-impaired / defaulted",
+      "sort_order": 3
+    },
+    {
+      "table_name": "staging_history",
+      "column_name": "to_stage",
+      "raw_value": "1",
+      "display_value": "Stage 1 - Performing",
+      "description": "No significant increase in credit risk",
+      "sort_order": 1
+    },
+    {
+      "table_name": "staging_history",
+      "column_name": "to_stage",
+      "raw_value": "2",
+      "display_value": "Stage 2 - SICR",
+      "description": "Significant increase in credit risk",
+      "sort_order": 2
+    },
+    {
+      "table_name": "staging_history",
+      "column_name": "to_stage",
+      "raw_value": "3",
+      "display_value": "Stage 3 - Credit-Impaired",
+      "description": "Credit-impaired / defaulted",
+      "sort_order": 3
+    }
+  ],
+  "sample_queries": [
+    {
+      "natural_language": "What is the total ECL by stage?",
+      "sql_query": "SELECT stage, SUM(ecl_lifetime) AS total_ecl FROM ecl_provisions GROUP BY stage ORDER BY stage",
+      "description": "Total lifetime ECL grouped by IFRS 9 stage."
+    },
+    {
+      "natural_language": "Show the NPL ratio for the corporate segment",
+      "sql_query": "SELECT SUM(e.ead) FILTER (WHERE e.stage = 3) / NULLIF(SUM(e.ead), 0) AS npl_ratio FROM exposures e JOIN facilities f ON f.id = e.facility_id JOIN counterparties c ON c.id = f.counterparty_id WHERE c.segment = 'corporate'",
+      "description": "Stage 3 EAD as a share of total EAD, corporate only."
+    }
+  ],
+  "knowledge": [
+    {
+      "title": "IFRS 9 Staging & ECL Policy Summary",
+      "source_url": "https://internal.wiki/ifrs9-staging-policy",
+      "content": "IFRS 9 Staging Criteria and ECL Calculation Policy\n\nThis document describes the bank's staging criteria under IFRS 9 and the corresponding Expected Credit Loss (ECL) calculation methodology.\n\nStage Classification\n\nAll facilities are classified into one of three stages at each reporting date:\n\nStage 1 — Performing: The facility has not experienced a Significant Increase in Credit Risk (SICR) since initial recognition. The bank recognises 12-month ECL as a provision.\n\nStage 2 — Underperforming (SICR): The facility has experienced a SICR but is not yet credit-impaired. The bank recognises lifetime ECL. SICR triggers include: (a) a credit rating downgrade of 2 or more notches since origination, (b) the facility being more than 30 days past due, (c) the counterparty being placed on a watch list, (d) adverse macro-economic indicators for the counterparty's sector.\n\nStage 3 — Non-Performing (Credit-Impaired): The facility meets the definition of default. Default triggers include: (a) more than 90 days past due, (b) the counterparty is flagged as defaulted (is_defaulted = true), (c) the facility has been restructured due to financial difficulty. Lifetime ECL is recognised and interest revenue is calculated on the net carrying amount (gross amount minus ECL provision).\n\nECL Calculation\n\nECL is calculated as: ECL = PD x LGD x EAD, where:\n- PD (Probability of Default): 12-month PD for Stage 1, lifetime PD for Stage 2 and 3. PD values are stored in the ecl_provisions table.\n- LGD (Loss Given Default): Estimated loss percentage if default occurs, taking into account collateral recoveries. Lower LGD values indicate better collateral coverage. Stored in ecl_provisions.lgd.\n- EAD (Exposure at Default): The gross carrying amount of the facility at the reporting date. Stored in exposures.ead.\n\nThe ecl_provisions table contains both ecl_12m (12-month ECL, used for Stage 1 reporting) and ecl_lifetime (lifetime ECL, used for Stage 2 and Stage 3 reporting).\n\nCollateral and LGD\n\nCollateral reduces LGD. Each collateral record is linked to a facility and has a collateral_value and haircut percentage. The net collateral value (collateral_value * (1 - haircut)) offsets the exposure. Collateral types include property, cash deposits, bank guarantees, and securities.\n\nStage Migration\n\nThe staging_history table tracks all stage transitions. Each record contains the from_stage, to_stage, transition_date, and a reason code. Reason codes are: origination (new loan at Stage 1), upgrade (improvement in credit quality), downgrade (SICR or deterioration), cure (return to performing after impairment), default (borrower entered default). A facility moving from Stage 1 to Stage 2 is a \"downgrade\" due to SICR. A facility moving from Stage 3 back to Stage 1 is a \"cure\".\n\nReporting Dimensions\n\nThe portfolio is typically analysed along these dimensions:\n- By stage (1, 2, 3) — the primary risk segmentation\n- By segment (retail, corporate, SME) — business unit view\n- By facility_type (mortgage, corporate_loan, consumer_loan, credit_card, overdraft) — product type view\n- By currency (EUR, USD, GBP) — currency exposure view\n- By credit_rating (AAA through CCC) — credit quality distribution\n- By reporting_date — time series analysis across quarters\n"
+    }
+  ]
+}

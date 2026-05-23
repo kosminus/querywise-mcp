@@ -1,0 +1,346 @@
+[
+  {
+    "table_name": "exposures",
+    "column_name": "stage",
+    "raw_value": "1",
+    "display_value": "Stage 1 - Performing",
+    "description": "No significant increase in credit risk; 12-month ECL",
+    "sort_order": 1
+  },
+  {
+    "table_name": "exposures",
+    "column_name": "stage",
+    "raw_value": "2",
+    "display_value": "Stage 2 - SICR",
+    "description": "Significant increase in credit risk; lifetime ECL",
+    "sort_order": 2
+  },
+  {
+    "table_name": "exposures",
+    "column_name": "stage",
+    "raw_value": "3",
+    "display_value": "Stage 3 - Credit-Impaired",
+    "description": "Credit-impaired / defaulted; lifetime ECL",
+    "sort_order": 3
+  },
+  {
+    "table_name": "facilities",
+    "column_name": "facility_type",
+    "raw_value": "mortgage",
+    "display_value": "Mortgage Loan",
+    "description": "Residential or commercial mortgage",
+    "sort_order": 1
+  },
+  {
+    "table_name": "facilities",
+    "column_name": "facility_type",
+    "raw_value": "corporate_loan",
+    "display_value": "Corporate Loan",
+    "description": "Term loan to a corporate entity",
+    "sort_order": 2
+  },
+  {
+    "table_name": "facilities",
+    "column_name": "facility_type",
+    "raw_value": "consumer_loan",
+    "display_value": "Consumer Loan",
+    "description": "Unsecured personal loan",
+    "sort_order": 3
+  },
+  {
+    "table_name": "facilities",
+    "column_name": "facility_type",
+    "raw_value": "credit_card",
+    "display_value": "Credit Card",
+    "description": "Revolving credit card facility",
+    "sort_order": 4
+  },
+  {
+    "table_name": "facilities",
+    "column_name": "facility_type",
+    "raw_value": "overdraft",
+    "display_value": "Overdraft",
+    "description": "Overdraft facility on current account",
+    "sort_order": 5
+  },
+  {
+    "table_name": "counterparties",
+    "column_name": "segment",
+    "raw_value": "retail",
+    "display_value": "Retail Banking",
+    "description": "Individual consumers and households",
+    "sort_order": 1
+  },
+  {
+    "table_name": "counterparties",
+    "column_name": "segment",
+    "raw_value": "corporate",
+    "display_value": "Corporate Banking",
+    "description": "Large corporate entities",
+    "sort_order": 2
+  },
+  {
+    "table_name": "counterparties",
+    "column_name": "segment",
+    "raw_value": "sme",
+    "display_value": "SME Banking",
+    "description": "Small and medium enterprises",
+    "sort_order": 3
+  },
+  {
+    "table_name": "collateral",
+    "column_name": "collateral_type",
+    "raw_value": "property",
+    "display_value": "Real Estate Property",
+    "description": "Residential or commercial real estate",
+    "sort_order": 1
+  },
+  {
+    "table_name": "collateral",
+    "column_name": "collateral_type",
+    "raw_value": "cash",
+    "display_value": "Cash Deposit",
+    "description": "Cash held as security",
+    "sort_order": 2
+  },
+  {
+    "table_name": "collateral",
+    "column_name": "collateral_type",
+    "raw_value": "guarantee",
+    "display_value": "Bank Guarantee",
+    "description": "Third-party bank guarantee",
+    "sort_order": 3
+  },
+  {
+    "table_name": "collateral",
+    "column_name": "collateral_type",
+    "raw_value": "securities",
+    "display_value": "Securities",
+    "description": "Bonds, equities, or other financial instruments",
+    "sort_order": 4
+  },
+  {
+    "table_name": "staging_history",
+    "column_name": "reason",
+    "raw_value": "origination",
+    "display_value": "New Origination",
+    "description": "Initial recognition at Stage 1",
+    "sort_order": 1
+  },
+  {
+    "table_name": "staging_history",
+    "column_name": "reason",
+    "raw_value": "upgrade",
+    "display_value": "Credit Improvement",
+    "description": "Upgrade due to improved credit quality",
+    "sort_order": 2
+  },
+  {
+    "table_name": "staging_history",
+    "column_name": "reason",
+    "raw_value": "downgrade",
+    "display_value": "Credit Deterioration",
+    "description": "Downgrade due to SICR or default triggers",
+    "sort_order": 3
+  },
+  {
+    "table_name": "staging_history",
+    "column_name": "reason",
+    "raw_value": "cure",
+    "display_value": "Return to Performing",
+    "description": "Recovery from impaired status",
+    "sort_order": 4
+  },
+  {
+    "table_name": "staging_history",
+    "column_name": "reason",
+    "raw_value": "default",
+    "display_value": "Default Event",
+    "description": "Borrower entered default",
+    "sort_order": 5
+  },
+  {
+    "table_name": "counterparties",
+    "column_name": "credit_rating",
+    "raw_value": "AAA",
+    "display_value": "AAA - Prime",
+    "description": "Highest credit quality; minimal default risk",
+    "sort_order": 1
+  },
+  {
+    "table_name": "counterparties",
+    "column_name": "credit_rating",
+    "raw_value": "AA",
+    "display_value": "AA - High Grade",
+    "description": "Very high credit quality; very low default risk",
+    "sort_order": 2
+  },
+  {
+    "table_name": "counterparties",
+    "column_name": "credit_rating",
+    "raw_value": "A",
+    "display_value": "A - Upper Medium",
+    "description": "High credit quality; low default risk",
+    "sort_order": 3
+  },
+  {
+    "table_name": "counterparties",
+    "column_name": "credit_rating",
+    "raw_value": "BBB",
+    "display_value": "BBB - Lower Medium",
+    "description": "Good credit quality; moderate default risk (investment grade floor)",
+    "sort_order": 4
+  },
+  {
+    "table_name": "counterparties",
+    "column_name": "credit_rating",
+    "raw_value": "BB",
+    "display_value": "BB - Speculative",
+    "description": "Speculative; substantial credit risk (sub-investment grade)",
+    "sort_order": 5
+  },
+  {
+    "table_name": "counterparties",
+    "column_name": "credit_rating",
+    "raw_value": "B",
+    "display_value": "B - Highly Speculative",
+    "description": "Highly speculative; high default risk",
+    "sort_order": 6
+  },
+  {
+    "table_name": "counterparties",
+    "column_name": "credit_rating",
+    "raw_value": "CCC",
+    "display_value": "CCC - Substantial Risk",
+    "description": "Very high credit risk; near default",
+    "sort_order": 7
+  },
+  {
+    "table_name": "counterparties",
+    "column_name": "is_defaulted",
+    "raw_value": "true",
+    "display_value": "Defaulted",
+    "description": "Counterparty has defaulted on obligations",
+    "sort_order": 1
+  },
+  {
+    "table_name": "counterparties",
+    "column_name": "is_defaulted",
+    "raw_value": "false",
+    "display_value": "Performing",
+    "description": "Counterparty is current on obligations",
+    "sort_order": 2
+  },
+  {
+    "table_name": "facilities",
+    "column_name": "currency",
+    "raw_value": "EUR",
+    "display_value": "Euro",
+    "description": "European single currency",
+    "sort_order": 1
+  },
+  {
+    "table_name": "facilities",
+    "column_name": "currency",
+    "raw_value": "USD",
+    "display_value": "US Dollar",
+    "description": "United States dollar",
+    "sort_order": 2
+  },
+  {
+    "table_name": "facilities",
+    "column_name": "currency",
+    "raw_value": "GBP",
+    "display_value": "British Pound",
+    "description": "British pound sterling",
+    "sort_order": 3
+  },
+  {
+    "table_name": "facilities",
+    "column_name": "is_revolving",
+    "raw_value": "true",
+    "display_value": "Revolving",
+    "description": "Revolving credit facility (e.g. credit card, overdraft) — can be drawn and repaid repeatedly",
+    "sort_order": 1
+  },
+  {
+    "table_name": "facilities",
+    "column_name": "is_revolving",
+    "raw_value": "false",
+    "display_value": "Term / Amortising",
+    "description": "Term facility with scheduled repayment (e.g. mortgage, term loan)",
+    "sort_order": 2
+  },
+  {
+    "table_name": "ecl_provisions",
+    "column_name": "stage",
+    "raw_value": "1",
+    "display_value": "Stage 1 - Performing",
+    "description": "No significant increase in credit risk; 12-month ECL",
+    "sort_order": 1
+  },
+  {
+    "table_name": "ecl_provisions",
+    "column_name": "stage",
+    "raw_value": "2",
+    "display_value": "Stage 2 - SICR",
+    "description": "Significant increase in credit risk; lifetime ECL",
+    "sort_order": 2
+  },
+  {
+    "table_name": "ecl_provisions",
+    "column_name": "stage",
+    "raw_value": "3",
+    "display_value": "Stage 3 - Credit-Impaired",
+    "description": "Credit-impaired / defaulted; lifetime ECL",
+    "sort_order": 3
+  },
+  {
+    "table_name": "staging_history",
+    "column_name": "from_stage",
+    "raw_value": "1",
+    "display_value": "Stage 1 - Performing",
+    "description": "No significant increase in credit risk",
+    "sort_order": 1
+  },
+  {
+    "table_name": "staging_history",
+    "column_name": "from_stage",
+    "raw_value": "2",
+    "display_value": "Stage 2 - SICR",
+    "description": "Significant increase in credit risk",
+    "sort_order": 2
+  },
+  {
+    "table_name": "staging_history",
+    "column_name": "from_stage",
+    "raw_value": "3",
+    "display_value": "Stage 3 - Credit-Impaired",
+    "description": "Credit-impaired / defaulted",
+    "sort_order": 3
+  },
+  {
+    "table_name": "staging_history",
+    "column_name": "to_stage",
+    "raw_value": "1",
+    "display_value": "Stage 1 - Performing",
+    "description": "No significant increase in credit risk",
+    "sort_order": 1
+  },
+  {
+    "table_name": "staging_history",
+    "column_name": "to_stage",
+    "raw_value": "2",
+    "display_value": "Stage 2 - SICR",
+    "description": "Significant increase in credit risk",
+    "sort_order": 2
+  },
+  {
+    "table_name": "staging_history",
+    "column_name": "to_stage",
+    "raw_value": "3",
+    "display_value": "Stage 3 - Credit-Impaired",
+    "description": "Credit-impaired / defaulted",
+    "sort_order": 3
+  }
+]

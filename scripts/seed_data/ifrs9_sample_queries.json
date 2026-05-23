@@ -1,0 +1,12 @@
+[
+  {
+    "natural_language": "What is the total ECL by stage?",
+    "sql_query": "SELECT stage, SUM(ecl_lifetime) AS total_ecl FROM ecl_provisions GROUP BY stage ORDER BY stage",
+    "description": "Total lifetime ECL grouped by IFRS 9 stage."
+  },
+  {
+    "natural_language": "Show the NPL ratio for the corporate segment",
+    "sql_query": "SELECT SUM(e.ead) FILTER (WHERE e.stage = 3) / NULLIF(SUM(e.ead), 0) AS npl_ratio FROM exposures e JOIN facilities f ON f.id = e.facility_id JOIN counterparties c ON c.id = f.counterparty_id WHERE c.segment = 'corporate'",
+    "description": "Stage 3 EAD as a share of total EAD, corporate only."
+  }
+]

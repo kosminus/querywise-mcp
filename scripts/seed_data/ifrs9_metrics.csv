@@ -1,0 +1,9 @@
+metric_name,display_name,description,sql_expression,aggregation_type,related_tables,dimensions,filters
+total_ecl,Total ECL,Total Expected Credit Loss across the entire portfolio,SUM(ecl_provisions.ecl_lifetime),sum,ecl_provisions,stage|facility_type|segment|currency,
+total_ead,Total EAD,Total Exposure at Default across the entire portfolio,SUM(exposures.ead),sum,exposures,stage|facility_type|segment|currency,
+coverage_ratio,Coverage Ratio,ECL as a percentage of total EAD — indicates provisioning adequacy,"SUM(ecl_provisions.ecl_lifetime) / NULLIF(SUM(exposures.ead), 0)",ratio,ecl_provisions|exposures,stage|facility_type|segment,
+stage1_exposure,Stage 1 Exposure,Total EAD for performing loans (Stage 1 — 12-month ECL),SUM(exposures.ead) FILTER (WHERE exposures.stage = 1),sum,exposures,facility_type|segment|currency,"{""stage"": 1}"
+stage2_exposure,Stage 2 Exposure,Total EAD for SICR loans (Stage 2 — lifetime ECL),SUM(exposures.ead) FILTER (WHERE exposures.stage = 2),sum,exposures,facility_type|segment|currency,"{""stage"": 2}"
+stage3_exposure,Stage 3 Exposure,Total EAD for credit-impaired loans (Stage 3 — lifetime ECL),SUM(exposures.ead) FILTER (WHERE exposures.stage = 3),sum,exposures,facility_type|segment|currency,"{""stage"": 3}"
+average_pd,Average PD,Weighted average Probability of Default across the portfolio,AVG(ecl_provisions.pd),avg,ecl_provisions,stage|facility_type|segment,
+npl_ratio,NPL Ratio,Non-Performing Loan ratio — Stage 3 EAD as a percentage of total EAD,"SUM(exposures.ead) FILTER (WHERE exposures.stage = 3) / NULLIF(SUM(exposures.ead), 0)",ratio,exposures,facility_type|segment|currency,

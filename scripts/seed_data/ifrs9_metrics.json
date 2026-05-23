@@ -1,0 +1,134 @@
+[
+  {
+    "metric_name": "total_ecl",
+    "display_name": "Total ECL",
+    "description": "Total Expected Credit Loss across the entire portfolio",
+    "sql_expression": "SUM(ecl_provisions.ecl_lifetime)",
+    "aggregation_type": "sum",
+    "related_tables": [
+      "ecl_provisions"
+    ],
+    "dimensions": [
+      "stage",
+      "facility_type",
+      "segment",
+      "currency"
+    ]
+  },
+  {
+    "metric_name": "total_ead",
+    "display_name": "Total EAD",
+    "description": "Total Exposure at Default across the entire portfolio",
+    "sql_expression": "SUM(exposures.ead)",
+    "aggregation_type": "sum",
+    "related_tables": [
+      "exposures"
+    ],
+    "dimensions": [
+      "stage",
+      "facility_type",
+      "segment",
+      "currency"
+    ]
+  },
+  {
+    "metric_name": "coverage_ratio",
+    "display_name": "Coverage Ratio",
+    "description": "ECL as a percentage of total EAD — indicates provisioning adequacy",
+    "sql_expression": "SUM(ecl_provisions.ecl_lifetime) / NULLIF(SUM(exposures.ead), 0)",
+    "aggregation_type": "ratio",
+    "related_tables": [
+      "ecl_provisions",
+      "exposures"
+    ],
+    "dimensions": [
+      "stage",
+      "facility_type",
+      "segment"
+    ]
+  },
+  {
+    "metric_name": "stage1_exposure",
+    "display_name": "Stage 1 Exposure",
+    "description": "Total EAD for performing loans (Stage 1 — 12-month ECL)",
+    "sql_expression": "SUM(exposures.ead) FILTER (WHERE exposures.stage = 1)",
+    "aggregation_type": "sum",
+    "related_tables": [
+      "exposures"
+    ],
+    "dimensions": [
+      "facility_type",
+      "segment",
+      "currency"
+    ],
+    "filters": {
+      "stage": 1
+    }
+  },
+  {
+    "metric_name": "stage2_exposure",
+    "display_name": "Stage 2 Exposure",
+    "description": "Total EAD for SICR loans (Stage 2 — lifetime ECL)",
+    "sql_expression": "SUM(exposures.ead) FILTER (WHERE exposures.stage = 2)",
+    "aggregation_type": "sum",
+    "related_tables": [
+      "exposures"
+    ],
+    "dimensions": [
+      "facility_type",
+      "segment",
+      "currency"
+    ],
+    "filters": {
+      "stage": 2
+    }
+  },
+  {
+    "metric_name": "stage3_exposure",
+    "display_name": "Stage 3 Exposure",
+    "description": "Total EAD for credit-impaired loans (Stage 3 — lifetime ECL)",
+    "sql_expression": "SUM(exposures.ead) FILTER (WHERE exposures.stage = 3)",
+    "aggregation_type": "sum",
+    "related_tables": [
+      "exposures"
+    ],
+    "dimensions": [
+      "facility_type",
+      "segment",
+      "currency"
+    ],
+    "filters": {
+      "stage": 3
+    }
+  },
+  {
+    "metric_name": "average_pd",
+    "display_name": "Average PD",
+    "description": "Weighted average Probability of Default across the portfolio",
+    "sql_expression": "AVG(ecl_provisions.pd)",
+    "aggregation_type": "avg",
+    "related_tables": [
+      "ecl_provisions"
+    ],
+    "dimensions": [
+      "stage",
+      "facility_type",
+      "segment"
+    ]
+  },
+  {
+    "metric_name": "npl_ratio",
+    "display_name": "NPL Ratio",
+    "description": "Non-Performing Loan ratio — Stage 3 EAD as a percentage of total EAD",
+    "sql_expression": "SUM(exposures.ead) FILTER (WHERE exposures.stage = 3) / NULLIF(SUM(exposures.ead), 0)",
+    "aggregation_type": "ratio",
+    "related_tables": [
+      "exposures"
+    ],
+    "dimensions": [
+      "facility_type",
+      "segment",
+      "currency"
+    ]
+  }
+]

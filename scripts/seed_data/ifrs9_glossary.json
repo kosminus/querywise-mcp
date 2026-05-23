@@ -1,0 +1,155 @@
+[
+  {
+    "term": "EAD",
+    "definition": "Exposure at Default - the total amount a bank is exposed to at the time of a borrower's default. This is the gross carrying amount for on-balance sheet items.",
+    "sql_expression": "exposures.ead",
+    "related_tables": [
+      "exposures"
+    ],
+    "related_columns": [
+      "exposures.ead"
+    ],
+    "examples": [
+      "SELECT SUM(ead) FROM exposures WHERE reporting_date = '2024-12-31'"
+    ]
+  },
+  {
+    "term": "PD",
+    "definition": "Probability of Default - the likelihood that a borrower will default on their obligations within a given time horizon (12 months for Stage 1, lifetime for Stage 2/3).",
+    "sql_expression": "ecl_provisions.pd",
+    "related_tables": [
+      "ecl_provisions"
+    ],
+    "related_columns": [
+      "ecl_provisions.pd"
+    ],
+    "examples": [
+      "SELECT AVG(pd) FROM ecl_provisions WHERE stage = 1"
+    ]
+  },
+  {
+    "term": "LGD",
+    "definition": "Loss Given Default - the percentage of exposure that is lost if a borrower defaults, after accounting for recoveries and collateral.",
+    "sql_expression": "ecl_provisions.lgd",
+    "related_tables": [
+      "ecl_provisions",
+      "collateral"
+    ],
+    "related_columns": [
+      "ecl_provisions.lgd"
+    ],
+    "examples": [
+      "SELECT AVG(lgd) FROM ecl_provisions WHERE stage = 3"
+    ]
+  },
+  {
+    "term": "ECL",
+    "definition": "Expected Credit Loss - the probability-weighted estimate of credit losses. Calculated as PD x LGD x EAD. Under IFRS 9, Stage 1 uses 12-month ECL while Stage 2 and 3 use lifetime ECL.",
+    "sql_expression": "ecl_provisions.ecl_lifetime",
+    "related_tables": [
+      "ecl_provisions",
+      "exposures"
+    ],
+    "related_columns": [
+      "ecl_provisions.ecl_12m",
+      "ecl_provisions.ecl_lifetime"
+    ],
+    "examples": [
+      "SELECT SUM(ecl_lifetime) FROM ecl_provisions",
+      "SELECT stage, SUM(ecl_lifetime) FROM ecl_provisions GROUP BY stage"
+    ]
+  },
+  {
+    "term": "Stage 1",
+    "definition": "Performing loans with no significant increase in credit risk since origination. Only 12-month ECL is recognised as a provision.",
+    "sql_expression": "exposures.stage = 1",
+    "related_tables": [
+      "exposures",
+      "ecl_provisions"
+    ],
+    "related_columns": [
+      "exposures.stage"
+    ],
+    "examples": [
+      "SELECT * FROM exposures WHERE stage = 1"
+    ]
+  },
+  {
+    "term": "Stage 2",
+    "definition": "Loans with a Significant Increase in Credit Risk (SICR) since origination but not yet credit-impaired. Lifetime ECL is recognised.",
+    "sql_expression": "exposures.stage = 2",
+    "related_tables": [
+      "exposures",
+      "ecl_provisions",
+      "staging_history"
+    ],
+    "related_columns": [
+      "exposures.stage"
+    ],
+    "examples": [
+      "SELECT * FROM exposures WHERE stage = 2"
+    ]
+  },
+  {
+    "term": "Stage 3",
+    "definition": "Credit-impaired (defaulted) loans. Lifetime ECL is recognised and interest revenue is calculated on the net carrying amount.",
+    "sql_expression": "exposures.stage = 3",
+    "related_tables": [
+      "exposures",
+      "ecl_provisions"
+    ],
+    "related_columns": [
+      "exposures.stage"
+    ],
+    "examples": [
+      "SELECT * FROM exposures WHERE stage = 3"
+    ]
+  },
+  {
+    "term": "SICR",
+    "definition": "Significant Increase in Credit Risk - the trigger for moving a loan from Stage 1 to Stage 2 under IFRS 9. Assessed using quantitative and qualitative criteria.",
+    "sql_expression": "staging_history.to_stage = 2",
+    "related_tables": [
+      "staging_history",
+      "exposures"
+    ],
+    "related_columns": [
+      "staging_history.to_stage",
+      "staging_history.reason"
+    ],
+    "examples": [
+      "SELECT * FROM staging_history WHERE to_stage = 2 AND reason = 'downgrade'"
+    ]
+  },
+  {
+    "term": "Coverage Ratio",
+    "definition": "The ratio of ECL provisions to total exposure (EAD). Indicates the level of provisioning relative to the outstanding loan book.",
+    "sql_expression": "SUM(ecl_provisions.ecl_lifetime) / SUM(exposures.ead)",
+    "related_tables": [
+      "ecl_provisions",
+      "exposures"
+    ],
+    "related_columns": [
+      "ecl_provisions.ecl_lifetime",
+      "exposures.ead"
+    ],
+    "examples": []
+  },
+  {
+    "term": "NPL",
+    "definition": "Non-Performing Loan - loans classified as Stage 3 (credit-impaired) under IFRS 9. These are loans where the borrower has defaulted or is unlikely to pay.",
+    "sql_expression": "exposures.stage = 3",
+    "related_tables": [
+      "exposures",
+      "counterparties"
+    ],
+    "related_columns": [
+      "exposures.stage",
+      "counterparties.is_defaulted"
+    ],
+    "examples": [
+      "SELECT COUNT(*) FROM exposures WHERE stage = 3",
+      "SELECT SUM(ead) FROM exposures WHERE stage = 3"
+    ]
+  }
+]

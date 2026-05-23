@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.env
+*.db
+*.db-wal
+*.db-shm
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Claude Code local settings (machine-specific)
+.claude/settings.local.json
