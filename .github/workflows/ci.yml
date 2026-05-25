@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package and dev tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      # server.py is kept clean; the rest of src/ has pre-existing lint debt
+      # (see CLAUDE.md), so full-tree ruff is informational, not a hard gate.
+      - name: Lint server.py (ruff)
+        run: ruff check src/querywise_mcp/server.py
+
+      - name: Lint full tree (ruff, informational)
+        continue-on-error: true
+        run: ruff check src/
+
+      - name: Byte-compile sanity
+        run: python -m compileall src/
+
+      - name: Import smoke test
+        run: python -c "import querywise_mcp.server; print('import OK')"
