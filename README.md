@@ -117,6 +117,14 @@ call the server-side `ask` tool. Omit it entirely to run keyword-only.
 glossary/metric/dictionary/sample-query/knowledge management
 (`list_*`/`add_*`/`delete_*`, plus `add_knowledge_url`).
 
+**Query paths** — the four tools people mix up:
+
+| Tool(s) | LLM key? | What it does |
+|---|---|---|
+| `get_semantic_context` + `run_sql` | No | Server grounds the question; the client writes the `SELECT`; run it read-only. |
+| `generate_sql` | Yes | Server writes SQL from the question but does **not** execute — review, then `run_sql`. |
+| `ask` | Yes | Full pipeline: ground → generate → execute → interpret, returns a Markdown answer. |
+
 **Resource**: `querywise://{connection}/schema` — the cached schema as text.
 **Prompt**: `text_to_sql(connection, question)` — scaffolds the ground→write→run loop.
 
