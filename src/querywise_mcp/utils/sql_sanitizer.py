@@ -37,21 +37,40 @@ _BLOCKED_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 ]
 
 
+# Match single/double-quoted strings and single/multi-line comments
+_TOKEN_PATTERN = re.compile(
+    r"('(?:\\.|''|[^'\\])*')"       # group 1: single-quoted string
+    r"|(\"(?:\\.|\"\"|[^\"\\])*\")" # group 2: double-quoted string
+    r"|(--[^\n]*)"                   # group 3: single-line comment
+    r"|(/\*.*?\*/)",                 # group 4: multi-line comment
+    re.DOTALL
+)
+
+
 def check_sql_safety(sql: str) -> list[str]:
     """Check SQL for dangerous patterns. Returns list of issues found, empty if safe."""
     issues: list[str] = []
-    # Strip comments before checking
-    cleaned = _strip_sql_comments(sql)
+    # Strip comments and string literals before checking
+    cleaned = _sanitize_query_text(sql)
     for pattern, message in _BLOCKED_PATTERNS:
         if pattern.search(cleaned):
             issues.append(message)
     return issues
 
 
-def _strip_sql_comments(sql: str) -> str:
-    """Remove SQL comments to prevent bypass via comment injection."""
-    # Remove single-line comments
-    sql = re.sub(r"--[^\n]*", "", sql)
-    # Remove multi-line comments
-    sql = re.sub(r"/\*.*?\*/", "", sql, flags=re.DOTALL)
-    return sql
+def _sanitize_query_text(sql: str) -> str:
+    """Strip comments and string literals from SQL text to prevent bypasses and false positives.
+
+    Replaces single-quoted strings with '' and double-quoted strings with "", and
+    replaces comments with a single space to preserve word boundaries.
+    """
+    def replace(match: re.Match) -> str:
+        if match.group(1):
+            return "''"
+        elif match.group(2):
+            return '""'
+        else:
+            return " "
+
+    return _TOKEN_PATTERN.sub(replace, sql)
+
