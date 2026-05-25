@@ -1,6 +1,6 @@
 [project]
 name = "querywise-mcp"
-version = "0.1.0"
+version = "1.0.0"
 description = "MCP server (and CLI) for querying databases in natural language through a semantic layer"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -17,7 +17,7 @@ keywords = [
     "natural-language-query",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Topic :: Database",

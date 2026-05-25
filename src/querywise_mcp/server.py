@@ -17,9 +17,12 @@ import logging
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
+from typing import Annotated
 
 import httpx
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
+from pydantic import Field
 from sqlalchemy import desc, func, select
 
 from querywise_mcp.config import settings
@@ -66,6 +69,24 @@ mcp = FastMCP(
 
 
 # --------------------------------------------------------------------------- #
+# Shared parameter descriptions & annotation presets
+# --------------------------------------------------------------------------- #
+# Reused for the ubiquitous ``connection`` argument so every tool documents it
+# identically (TDQS "Parameter Semantics").
+_CONN_DESC = (
+    "Target database connection — its name or id (case-insensitive). "
+    "List the available connections with list_connections."
+)
+Connection = Annotated[str, Field(description=_CONN_DESC)]
+
+# Annotation presets (behavioral hints surfaced to MCP clients).
+_READ_ONLY = dict(readOnlyHint=True)
+_READ_ONLY_EXTERNAL = dict(readOnlyHint=True, openWorldHint=True)
+_WRITE = dict(readOnlyHint=False, idempotentHint=False)
+_DESTRUCTIVE = dict(readOnlyHint=False, destructiveHint=True, idempotentHint=True)
+
+
+# --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
 async def _resolve_connection(db, connection: str) -> DatabaseConnection:
@@ -109,28 +130,57 @@ def _conn_dict(c: DatabaseConnection) -> dict:
 # --------------------------------------------------------------------------- #
 # Connections
 # --------------------------------------------------------------------------- #
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="List connections", **_READ_ONLY))
 async def list_connections() -> list[dict]:
-    """List all configured database connections."""
+    """List all configured database connections (id, name, type, limits).
+
+    Call this first to discover which databases exist and to get the name or id
+    that every other tool's `connection` argument accepts. Read-only; returns an
+    empty list when nothing is configured yet (add one with create_connection).
+    """
     async with session_scope() as db:
         conns = await connection_service.list_connections(db)
         return [_conn_dict(c) for c in conns]
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Create connection", **_WRITE))
 async def create_connection(
-    name: str,
-    connector_type: str,
-    connection_string: str,
-    default_schema: str = "public",
-    max_rows: int = 1000,
-    max_query_timeout_seconds: int = 30,
+    name: Annotated[
+        str,
+        Field(description="Unique, human-friendly name used to reference this connection later."),
+    ],
+    connector_type: Annotated[
+        str,
+        Field(
+            description="One of: postgresql, bigquery, databricks, mysql, snowflake."
+        ),
+    ],
+    connection_string: Annotated[
+        str,
+        Field(
+            description="Driver URL (PostgreSQL/MySQL) or connector-specific JSON config "
+            "(BigQuery/Databricks). Stored encrypted at rest."
+        ),
+    ],
+    default_schema: Annotated[
+        str,
+        Field(description="Default schema to introspect and query when none is specified."),
+    ] = "public",
+    max_rows: Annotated[
+        int,
+        Field(description="Maximum number of rows any query on this connection may return."),
+    ] = 1000,
+    max_query_timeout_seconds: Annotated[
+        int,
+        Field(description="Per-query timeout, in seconds, for this connection."),
+    ] = 30,
 ) -> dict:
-    """Create a database connection.
+    """Register a new target database connection (credentials encrypted at rest).
 
-    connector_type is one of: postgresql, bigquery, databricks, mysql, snowflake.
-    connection_string is the driver URL (postgres) or the connector-specific JSON
-    config (bigquery/databricks). It is encrypted at rest.
+    Use once per database before introspecting or querying it. This only stores
+    the connection — it does NOT verify connectivity or read the schema; follow
+    with test_connection, then introspect_connection. Returns the created
+    connection's id and metadata.
     """
     async with session_scope() as db:
         conn = await connection_service.create_connection(
@@ -145,22 +195,41 @@ async def create_connection(
         return _conn_dict(conn)
 
 
-@mcp.tool()
-async def test_connection(connection: str) -> dict:
-    """Test connectivity to a configured connection (by name or id)."""
+@mcp.tool(annotations=ToolAnnotations(title="Test connection", **_READ_ONLY_EXTERNAL))
+async def test_connection(connection: Connection) -> dict:
+    """Check that a configured connection can be reached and authenticated.
+
+    Use after create_connection to validate credentials and network access before
+    introspecting. Read-only: opens and closes a probe connection without reading
+    the schema (use introspect_connection for that). Returns {success, message}.
+    """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
         ok, message = await connection_service.test_connection(db, conn.id)
         return {"success": ok, "message": message}
 
 
-@mcp.tool()
-async def introspect_connection(connection: str, generate_embeddings: bool = True) -> dict:
-    """Introspect and cache a connection's schema (tables, columns, foreign keys).
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Introspect connection", readOnlyHint=False, idempotentHint=True, openWorldHint=True
+    )
+)
+async def introspect_connection(
+    connection: Connection,
+    generate_embeddings: Annotated[
+        bool,
+        Field(
+            description="Also build vector embeddings for semantic schema search. Needs an "
+            "embedding provider; otherwise keyword matching is used."
+        ),
+    ] = True,
+) -> dict:
+    """Read the target database's structure (tables, columns, foreign keys) and cache it.
 
-    Run this once per connection before querying. With generate_embeddings=True,
-    also builds vector embeddings for semantic search (requires an embedding
-    provider; otherwise keyword matching is used).
+    Run once per connection before querying, and again after the schema changes.
+    Idempotent — re-running refreshes the cache. The cache is what list_tables,
+    describe_table, and get_semantic_context read from. Returns counts of cached
+    objects plus the number of embeddings generated.
     """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
@@ -172,9 +241,14 @@ async def introspect_connection(connection: str, generate_embeddings: bool = Tru
     return {**counts, "embeddings_generated": embedded}
 
 
-@mcp.tool()
-async def delete_connection(connection: str) -> dict:
-    """Delete a connection and all its cached schema + semantic metadata."""
+@mcp.tool(annotations=ToolAnnotations(title="Delete connection", **_DESTRUCTIVE))
+async def delete_connection(connection: Connection) -> dict:
+    """Permanently delete a connection and all its cached schema + semantic metadata.
+
+    Removes the connection plus its glossary, metrics, dictionary, sample queries,
+    and knowledge. Destructive and not reversible — use only to retire a database
+    you no longer query. Returns {deleted: true}.
+    """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
         await connection_service.delete_connection(db, conn.id)
@@ -184,9 +258,15 @@ async def delete_connection(connection: str) -> dict:
 # --------------------------------------------------------------------------- #
 # Schema
 # --------------------------------------------------------------------------- #
-@mcp.tool()
-async def list_tables(connection: str) -> list[dict]:
-    """List cached tables for a connection with their columns."""
+@mcp.tool(annotations=ToolAnnotations(title="List tables", **_READ_ONLY))
+async def list_tables(connection: Connection) -> list[dict]:
+    """List a connection's cached tables, each with its columns.
+
+    Returns name, type, comment, row-count estimate, and per-column details
+    (type, nullability, primary key). Reads the cache from introspect_connection
+    (run that first if the result is empty). Use for a schema-wide overview; for
+    one table's foreign keys and relationships, use describe_table. Read-only.
+    """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
         tables = await schema_service.get_tables(db, conn.id)
@@ -213,9 +293,21 @@ async def list_tables(connection: str) -> list[dict]:
         ]
 
 
-@mcp.tool()
-async def describe_table(connection: str, table_name: str) -> dict:
-    """Describe one table: columns plus incoming/outgoing foreign keys."""
+@mcp.tool(annotations=ToolAnnotations(title="Describe table", **_READ_ONLY))
+async def describe_table(
+    connection: Connection,
+    table_name: Annotated[
+        str,
+        Field(description="Exact table name to describe, as shown by list_tables."),
+    ],
+) -> dict:
+    """Describe one cached table in detail, including its foreign-key relationships.
+
+    Returns columns (with defaults/comments), outgoing foreign keys, and incoming
+    references from other tables. Use when you need a single table's keys to write
+    a join; for a list of all tables use list_tables. Reads the cache (introspect
+    first). Raises if the table is not found.
+    """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
         tables = await schema_service.get_tables(db, conn.id)
@@ -260,14 +352,24 @@ async def describe_table(connection: str, table_name: str) -> dict:
 # --------------------------------------------------------------------------- #
 # Core query tools
 # --------------------------------------------------------------------------- #
-@mcp.tool()
-async def get_semantic_context(connection: str, question: str) -> str:
-    """Return grounded context for a question: the relevant schema, foreign keys,
-    business glossary, metric definitions, knowledge excerpts, value dictionaries,
-    and example queries — formatted for SQL generation.
+@mcp.tool(annotations=ToolAnnotations(title="Get semantic context", **_READ_ONLY))
+async def get_semantic_context(
+    connection: Connection,
+    question: Annotated[
+        str,
+        Field(
+            description="The natural-language question you intend to answer with SQL; used to "
+            "select the most relevant schema and semantic-layer entries."
+        ),
+    ],
+) -> str:
+    """Assemble grounded, SQL-ready context for a question.
 
-    This is the recommended first step: pass the result to your own reasoning,
-    write a read-only SELECT, then call run_sql.
+    Returns the relevant tables/columns, foreign keys, business glossary, metric
+    definitions, value dictionaries, knowledge excerpts, and example queries as
+    formatted text. This is the recommended first step of the lightweight path:
+    take the result, write a read-only SELECT yourself, then call run_sql. Needs
+    no LLM key. For a fully automated answer instead, use ask.
     """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
@@ -275,12 +377,24 @@ async def get_semantic_context(connection: str, question: str) -> str:
         return ctx.prompt_context
 
 
-@mcp.tool()
-async def run_sql(connection: str, sql: str) -> dict:
-    """Execute a read-only SQL query against a connection and return the rows.
+@mcp.tool(annotations=ToolAnnotations(title="Run SQL", **_READ_ONLY_EXTERNAL))
+async def run_sql(
+    connection: Connection,
+    sql: Annotated[
+        str,
+        Field(
+            description="A single read-only SELECT statement to execute. Non-SELECT or unsafe "
+            "SQL is rejected."
+        ),
+    ],
+) -> dict:
+    """Execute a read-only SQL SELECT against the target database and return the rows.
 
-    Rejects non-SELECT / unsafe SQL. Results are row-limited per the connection's
-    settings. Use this after writing SQL from get_semantic_context.
+    Use to run SQL you wrote from get_semantic_context. Enforces read-only:
+    rejects INSERT/UPDATE/DELETE/DDL and other unsafe statements; results are
+    row-limited per the connection's max_rows. Returns columns, rows, row_count,
+    truncated, and execution_time_ms. To have the server write the SQL for you,
+    use generate_sql or ask.
     """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
@@ -294,25 +408,42 @@ async def run_sql(connection: str, sql: str) -> dict:
         }
 
 
-@mcp.tool()
-async def generate_sql(connection: str, question: str) -> dict:
-    """Generate SQL for a question using the server-side LLM pipeline (no execute).
+@mcp.tool(annotations=ToolAnnotations(title="Generate SQL", **_READ_ONLY_EXTERNAL))
+async def generate_sql(
+    connection: Connection,
+    question: Annotated[
+        str,
+        Field(description="Natural-language question to translate into SQL."),
+    ],
+) -> dict:
+    """Translate a natural-language question into SQL via the server LLM, without executing it.
 
-    Requires an LLM provider to be configured. For zero-key operation, prefer
-    get_semantic_context + your own SQL + run_sql.
+    Requires an LLM provider to be configured. Use when you want to review or edit
+    the SQL before running it with run_sql. For zero-key operation, use
+    get_semantic_context and write the SQL yourself; to also execute and interpret
+    in one step, use ask. Returns the generated SQL plus supporting details.
     """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
         return await query_service.generate_sql_only(db, conn.id, question)
 
 
-@mcp.tool()
-async def ask(connection: str, question: str) -> str:
-    """Answer a natural-language question end-to-end via the server pipeline:
-    build context, generate SQL, validate, execute, and interpret.
+@mcp.tool(annotations=ToolAnnotations(title="Ask (NL->answer)", **_READ_ONLY_EXTERNAL))
+async def ask(
+    connection: Connection,
+    question: Annotated[
+        str,
+        Field(description="Natural-language question to answer end-to-end."),
+    ],
+) -> str:
+    """Answer a natural-language question end-to-end via the server pipeline.
 
-    Returns a Markdown report (answer summary, highlights, executed SQL, metadata,
-    suggested follow-ups, and a data preview). Requires an LLM provider configured.
+    Builds context, generates SQL, validates, executes it (read-only), and
+    interprets the results. This is the fully automated path and requires an LLM
+    provider. Use it when you want a finished answer rather than raw rows; use the
+    get_semantic_context + run_sql path for manual control, or generate_sql to get
+    SQL without executing. Returns a Markdown report (summary, highlights,
+    executed SQL, metadata, follow-ups, and a data preview).
     """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
@@ -320,9 +451,19 @@ async def ask(connection: str, question: str) -> str:
         return format_ask_result(res)
 
 
-@mcp.tool()
-async def query_history(connection: str, limit: int = 20) -> list[dict]:
-    """Recent query executions for a connection (newest first)."""
+@mcp.tool(annotations=ToolAnnotations(title="Query history", **_READ_ONLY))
+async def query_history(
+    connection: Connection,
+    limit: Annotated[
+        int,
+        Field(description="Maximum number of past executions to return (newest first)."),
+    ] = 20,
+) -> list[dict]:
+    """List recent query executions for a connection, newest first.
+
+    Returns each execution's question, final SQL, status, row count, and
+    timestamp. Use to review or reuse previously run queries. Read-only.
+    """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
         res = await db.execute(
@@ -347,9 +488,15 @@ async def query_history(connection: str, limit: int = 20) -> list[dict]:
 # --------------------------------------------------------------------------- #
 # Semantic layer: glossary / metrics / dictionary / sample queries / knowledge
 # --------------------------------------------------------------------------- #
-@mcp.tool()
-async def list_glossary(connection: str) -> list[dict]:
-    """List business glossary terms for a connection."""
+@mcp.tool(annotations=ToolAnnotations(title="List glossary terms", **_READ_ONLY))
+async def list_glossary(connection: Connection) -> list[dict]:
+    """List the business glossary terms defined for a connection.
+
+    Returns each term, its plain-language definition, the SQL expression that
+    implements it, and related tables. Glossary terms map business language (e.g.
+    'active customer') to SQL. Add with add_glossary_term; for numeric KPIs see
+    list_metrics. Read-only.
+    """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
         terms = await semantic_service.list_glossary(db, conn.id)
@@ -365,15 +512,34 @@ async def list_glossary(connection: str) -> list[dict]:
         ]
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Add glossary term", **_WRITE))
 async def add_glossary_term(
-    connection: str,
-    term: str,
-    definition: str,
-    sql_expression: str,
-    related_tables: list[str] | None = None,
+    connection: Connection,
+    term: Annotated[
+        str,
+        Field(description="The business term being defined (e.g. 'active customer')."),
+    ],
+    definition: Annotated[
+        str,
+        Field(description="Plain-language meaning of the term."),
+    ],
+    sql_expression: Annotated[
+        str,
+        Field(
+            description="SQL snippet/predicate that implements the term (e.g. a WHERE condition)."
+        ),
+    ],
+    related_tables: Annotated[
+        list[str] | None,
+        Field(description="Optional list of table names the term applies to."),
+    ] = None,
 ) -> dict:
-    """Add a business glossary term (e.g. how 'active customer' maps to SQL)."""
+    """Define a business glossary term that maps business language to a SQL expression.
+
+    Use to teach the semantic layer phrases like 'active customer' so future
+    grounding and generation apply them consistently. For a named, reusable
+    aggregate (a KPI) use add_metric instead. Returns the new term's id.
+    """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
         obj = await semantic_service.create_glossary(
@@ -382,17 +548,31 @@ async def add_glossary_term(
         return {"id": str(obj.id), "term": obj.term}
 
 
-@mcp.tool()
-async def delete_glossary_term(term_id: str) -> dict:
-    """Delete a glossary term by id."""
+@mcp.tool(annotations=ToolAnnotations(title="Delete glossary term", **_DESTRUCTIVE))
+async def delete_glossary_term(
+    term_id: Annotated[
+        str,
+        Field(description="Id of the glossary term to delete (from list_glossary)."),
+    ],
+) -> dict:
+    """Delete one business glossary term by its id.
+
+    Destructive and not reversible. Look up ids with list_glossary. Returns
+    {deleted} indicating whether a matching term was removed.
+    """
     async with session_scope() as db:
         ok = await semantic_service.delete_glossary(db, uuid.UUID(term_id))
         return {"deleted": ok}
 
 
-@mcp.tool()
-async def list_metrics(connection: str) -> list[dict]:
-    """List metric definitions for a connection."""
+@mcp.tool(annotations=ToolAnnotations(title="List metrics", **_READ_ONLY))
+async def list_metrics(connection: Connection) -> list[dict]:
+    """List the metric definitions for a connection.
+
+    Returns each metric's name, display name, SQL aggregate expression, and
+    dimensions. Metrics are named, reusable KPIs. Add with add_metric; for
+    phrase-to-SQL term mappings see list_glossary. Read-only.
+    """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
         metrics = await semantic_service.list_metrics(db, conn.id)
@@ -408,17 +588,42 @@ async def list_metrics(connection: str) -> list[dict]:
         ]
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Add metric", **_WRITE))
 async def add_metric(
-    connection: str,
-    metric_name: str,
-    display_name: str,
-    sql_expression: str,
-    description: str | None = None,
-    related_tables: list[str] | None = None,
-    dimensions: list[str] | None = None,
+    connection: Connection,
+    metric_name: Annotated[
+        str,
+        Field(description="Machine-friendly metric identifier (e.g. 'gross_revenue')."),
+    ],
+    display_name: Annotated[
+        str,
+        Field(description="Human-friendly metric label (e.g. 'Gross Revenue')."),
+    ],
+    sql_expression: Annotated[
+        str,
+        Field(description="SQL aggregate expression implementing the metric (e.g. SUM(amount))."),
+    ],
+    description: Annotated[
+        str | None,
+        Field(description="Optional explanation of what the metric measures."),
+    ] = None,
+    related_tables: Annotated[
+        list[str] | None,
+        Field(description="Optional list of table names the metric is computed from."),
+    ] = None,
+    dimensions: Annotated[
+        list[str] | None,
+        Field(
+            description="Optional dimensions to group the metric by (e.g. ['region','month'])."
+        ),
+    ] = None,
 ) -> dict:
-    """Add a metric definition (a named, reusable SQL aggregate)."""
+    """Define a metric: a named, reusable SQL aggregate (a KPI).
+
+    Use for quantitative measures like revenue or default rate so grounding and
+    generation can reuse them; for phrase-to-SQL mappings use add_glossary_term
+    instead. Returns the new metric's id and name.
+    """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
         obj = await semantic_service.create_metric(
@@ -434,24 +639,53 @@ async def add_metric(
         return {"id": str(obj.id), "metric_name": obj.metric_name}
 
 
-@mcp.tool()
-async def delete_metric(metric_id: str) -> dict:
-    """Delete a metric definition by id."""
+@mcp.tool(annotations=ToolAnnotations(title="Delete metric", **_DESTRUCTIVE))
+async def delete_metric(
+    metric_id: Annotated[
+        str,
+        Field(description="Id of the metric to delete (from list_metrics)."),
+    ],
+) -> dict:
+    """Delete one metric definition by its id.
+
+    Destructive and not reversible. Look up ids with list_metrics. Returns
+    {deleted} indicating whether a matching metric was removed.
+    """
     async with session_scope() as db:
         ok = await semantic_service.delete_metric(db, uuid.UUID(metric_id))
         return {"deleted": ok}
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Add dictionary entry", **_WRITE))
 async def add_dictionary_entry(
-    connection: str,
-    table_name: str,
-    column_name: str,
-    raw_value: str,
-    display_value: str,
-    description: str | None = None,
+    connection: Connection,
+    table_name: Annotated[
+        str,
+        Field(description="Table containing the column (must already be introspected)."),
+    ],
+    column_name: Annotated[
+        str,
+        Field(description="Column whose coded value you are explaining."),
+    ],
+    raw_value: Annotated[
+        str,
+        Field(description="The stored/coded value as it appears in the column (e.g. '1')."),
+    ],
+    display_value: Annotated[
+        str,
+        Field(description="The business meaning of that value (e.g. 'Performing')."),
+    ],
+    description: Annotated[
+        str | None,
+        Field(description="Optional extra explanation of the value."),
+    ] = None,
 ) -> dict:
-    """Map a raw column value to its business meaning (e.g. stage '1' -> 'Performing')."""
+    """Map a coded column value to its business meaning (e.g. stage '1' -> 'Performing').
+
+    Use so grounding and generation can interpret enum-like codes. Requires the
+    connection to be introspected first so the column can be resolved. Returns the
+    new entry's id.
+    """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
         col_id = await semantic_service.resolve_column_id(
@@ -468,9 +702,13 @@ async def add_dictionary_entry(
         return {"id": str(obj.id), "raw_value": obj.raw_value}
 
 
-@mcp.tool()
-async def list_sample_queries(connection: str) -> list[dict]:
-    """List saved example NL->SQL pairs used as few-shot examples."""
+@mcp.tool(annotations=ToolAnnotations(title="List sample queries", **_READ_ONLY))
+async def list_sample_queries(connection: Connection) -> list[dict]:
+    """List saved example natural-language -> SQL pairs for a connection.
+
+    These validated pairs are used as few-shot examples that steer SQL
+    generation. Add with add_sample_query. Read-only.
+    """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
         items = await semantic_service.list_sample_queries(db, conn.id)
@@ -485,14 +723,27 @@ async def list_sample_queries(connection: str) -> list[dict]:
         ]
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Add sample query", **_WRITE))
 async def add_sample_query(
-    connection: str,
-    natural_language: str,
-    sql_query: str,
-    description: str | None = None,
+    connection: Connection,
+    natural_language: Annotated[
+        str,
+        Field(description="Example question in natural language."),
+    ],
+    sql_query: Annotated[
+        str,
+        Field(description="Correct, validated SQL that answers the question."),
+    ],
+    description: Annotated[
+        str | None,
+        Field(description="Optional note about the example."),
+    ] = None,
 ) -> dict:
-    """Add a validated example NL->SQL pair (improves future generations)."""
+    """Save a validated natural-language -> SQL example to improve future generation.
+
+    Use to capture good question/SQL pairs for this connection; they are reused as
+    few-shot examples by generate_sql and ask. Returns the new example's id.
+    """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
         obj = await semantic_service.create_sample_query(
@@ -501,9 +752,14 @@ async def add_sample_query(
         return {"id": str(obj.id)}
 
 
-@mcp.tool()
-async def list_knowledge(connection: str) -> list[dict]:
-    """List imported knowledge documents for a connection."""
+@mcp.tool(annotations=ToolAnnotations(title="List knowledge", **_READ_ONLY))
+async def list_knowledge(connection: Connection) -> list[dict]:
+    """List the knowledge documents imported for a connection.
+
+    Returns each document's title, source URL, and chunk count. Knowledge docs
+    are searchable business context (policies, data dictionaries, runbooks) used
+    during grounding. Add with add_knowledge or add_knowledge_url. Read-only.
+    """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
         docs = await semantic_service.list_knowledge(db, conn.id)
@@ -518,14 +774,30 @@ async def list_knowledge(connection: str) -> list[dict]:
         ]
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(title="Add knowledge (text)", **_WRITE))
 async def add_knowledge(
-    connection: str,
-    title: str,
-    content: str,
-    source_url: str | None = None,
+    connection: Connection,
+    title: Annotated[
+        str,
+        Field(description="Title for the knowledge document."),
+    ],
+    content: Annotated[
+        str,
+        Field(
+            description="Document body as plain text or HTML; it is chunked and indexed for search."
+        ),
+    ],
+    source_url: Annotated[
+        str | None,
+        Field(description="Optional source URL to record as provenance."),
+    ] = None,
 ) -> dict:
-    """Import documentation (plain text or HTML) as searchable business knowledge."""
+    """Import a document you provide (plain text or HTML) as searchable business knowledge.
+
+    Use when you already have the content; to fetch it from a web page instead,
+    use add_knowledge_url. The content is chunked and embedded for semantic
+    retrieval during grounding. Returns the document id and chunk count.
+    """
     async with session_scope() as db:
         conn = await _resolve_connection(db, connection)
         doc = await knowledge_service.import_document(
@@ -534,9 +806,28 @@ async def add_knowledge(
         return {"id": str(doc.id), "title": doc.title, "chunks": doc.chunk_count}
 
 
-@mcp.tool()
-async def add_knowledge_url(connection: str, url: str, title: str | None = None) -> dict:
-    """Fetch a URL server-side and import its content as business knowledge."""
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="Add knowledge (URL)", readOnlyHint=False, idempotentHint=False, openWorldHint=True
+    )
+)
+async def add_knowledge_url(
+    connection: Connection,
+    url: Annotated[
+        str,
+        Field(description="Public URL to fetch server-side and import."),
+    ],
+    title: Annotated[
+        str | None,
+        Field(description="Optional title; defaults to the URL."),
+    ] = None,
+) -> dict:
+    """Fetch a web page server-side and import its content as searchable business knowledge.
+
+    Use to ingest documentation by URL; to import content you already have, use
+    add_knowledge. Performs an outbound HTTP GET (follows redirects, 30s timeout),
+    then chunks and embeds the page. Returns the document id and chunk count.
+    """
     async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
         resp = await client.get(url)
         resp.raise_for_status()
@@ -549,9 +840,18 @@ async def add_knowledge_url(connection: str, url: str, title: str | None = None)
         return {"id": str(doc.id), "title": doc.title, "chunks": doc.chunk_count}
 
 
-@mcp.tool()
-async def delete_knowledge(doc_id: str) -> dict:
-    """Delete a knowledge document by id."""
+@mcp.tool(annotations=ToolAnnotations(title="Delete knowledge", **_DESTRUCTIVE))
+async def delete_knowledge(
+    doc_id: Annotated[
+        str,
+        Field(description="Id of the knowledge document to delete (from list_knowledge)."),
+    ],
+) -> dict:
+    """Delete one knowledge document (and its chunks) by id.
+
+    Destructive and not reversible. Look up ids with list_knowledge. Returns
+    {deleted} indicating whether a matching document was removed.
+    """
     async with session_scope() as db:
         ok = await semantic_service.delete_knowledge(db, uuid.UUID(doc_id))
         return {"deleted": ok}
