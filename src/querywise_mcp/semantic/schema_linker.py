@@ -72,9 +72,8 @@ async def find_relevant_tables(
         scored[key].keyword_score = keyword_match_score(table.table_name, keywords)
 
     # Stage 3: Relationship expansion — boost tables connected via FK to high-scoring tables
-    top_table_ids = [
-        uuid.UUID(s.id) for s in sorted(scored.values(), key=lambda s: s.final_score, reverse=True)[:5]
-    ]
+    top_scored = sorted(scored.values(), key=lambda s: s.final_score, reverse=True)[:5]
+    top_table_ids = [uuid.UUID(s.id) for s in top_scored]
     related_tables = await _get_related_tables(db, connection_id, top_table_ids)
     for table in related_tables:
         key = str(table.id)

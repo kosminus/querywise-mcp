@@ -19,12 +19,12 @@ _provider_error: str | None = None
 _warned_unavailable = False
 
 
-class EmbeddingsUnavailable(RuntimeError):
+class EmbeddingsUnavailableError(RuntimeError):
     """No embedding provider could be initialized (e.g. missing API key)."""
 
 
 def _get_provider():
-    """Return the cached embedding provider, or raise EmbeddingsUnavailable.
+    """Return the cached embedding provider, or raise EmbeddingsUnavailableError.
 
     The failure is cached so we don't repeatedly try (and fail) to construct a
     provider — which previously produced a traceback per item embedded.
@@ -33,13 +33,13 @@ def _get_provider():
     if _provider is not None:
         return _provider
     if _provider_error is not None:
-        raise EmbeddingsUnavailable(_provider_error)
+        raise EmbeddingsUnavailableError(_provider_error)
     try:
         _provider = get_embedding_provider()
         return _provider
     except Exception as e:
         _provider_error = str(e)
-        raise EmbeddingsUnavailable(_provider_error) from e
+        raise EmbeddingsUnavailableError(_provider_error) from e
 
 
 def embeddings_available() -> bool:
@@ -51,7 +51,7 @@ def embeddings_available() -> bool:
     try:
         _get_provider()
         return True
-    except EmbeddingsUnavailable as e:
+    except EmbeddingsUnavailableError as e:
         if not _warned_unavailable:
             logger.warning(
                 "Embeddings disabled (%s). Using keyword-only search. To enable, set "

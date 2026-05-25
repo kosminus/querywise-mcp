@@ -30,7 +30,8 @@ CREATE TABLE counterparties (
 CREATE TABLE facilities (
     facility_id      INTEGER PRIMARY KEY,
     counterparty_id  INTEGER NOT NULL REFERENCES counterparties(counterparty_id),
-    facility_type    TEXT    NOT NULL,  -- mortgage|corporate_loan|consumer_loan|credit_card|overdraft
+    -- facility_type: mortgage|corporate_loan|consumer_loan|credit_card|overdraft
+    facility_type    TEXT    NOT NULL,
     currency         TEXT    NOT NULL,  -- EUR|USD|GBP
     is_revolving     INTEGER NOT NULL,  -- 0 | 1
     limit_amount     REAL    NOT NULL,

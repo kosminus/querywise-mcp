@@ -47,11 +47,11 @@ def get_provider(provider_type: str, api_key: str | None = None) -> BaseLLMProvi
 
     try:
         pt = LLMProviderType(provider_type)
-    except ValueError:
+    except ValueError as err:
         raise ValueError(
             f"Unknown provider: {provider_type}. "
             f"Available: {[t.value for t in LLMProviderType]}"
-        )
+        ) from err
 
     if api_key is None:
         from querywise_mcp.config import settings
