@@ -153,6 +153,17 @@ block. Embeddings are stored as float32 BLOBs and searched with sqlite-vec's
 back to in-process cosine. With no embedding provider, it degrades to
 keyword-only matching.
 
+### Building the semantic layer
+
+The glossary, metrics, value dictionaries, sample queries, and knowledge docs
+are populated through the MCP management tools — so you can build them
+**conversationally from an MCP client like Claude**, no CLI required. Asking
+Claude to "add a glossary term *active customer* defined as … with SQL …" calls
+`add_glossary_term`; the same goes for `add_metric`, `add_dictionary_entry`,
+`add_sample_query`, and `add_knowledge` / `add_knowledge_url` (and the matching
+`list_*` / `delete_*` tools to review or remove them). For a ready-made example,
+`querywise seed-sample` loads the bundled IFRS 9 banking layer.
+
 ## Architecture
 
 ```
