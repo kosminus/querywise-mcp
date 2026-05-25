@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = logging.getLogger(__name__)
-
 from querywise_mcp.db.models.dictionary import DictionaryEntry
 from querywise_mcp.db.models.glossary import GlossaryTerm
 from querywise_mcp.db.models.knowledge import KnowledgeChunk, KnowledgeDocument
@@ -17,6 +15,8 @@ from querywise_mcp.db.models.sample_query import SampleQuery
 from querywise_mcp.db.models.schema_cache import CachedColumn
 from querywise_mcp.db.vectors import knn
 from querywise_mcp.semantic.relevance_scorer import extract_keywords
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -123,7 +123,9 @@ async def resolve_glossary(
                     ))
                     seen_terms.add(term.term)
         except Exception:
-            logger.warning("Glossary vector search failed, using keyword results only.", exc_info=True)
+            logger.warning(
+                "Glossary vector search failed, using keyword results only.", exc_info=True
+            )
 
     return results
 
@@ -144,7 +146,10 @@ async def resolve_metrics(
         select(MetricDefinition).where(MetricDefinition.connection_id == connection_id)
     )
     for metric in all_metrics_result.scalars().all():
-        if metric.display_name.lower() in question_lower or metric.metric_name.lower() in question_lower:
+        if (
+            metric.display_name.lower() in question_lower
+            or metric.metric_name.lower() in question_lower
+        ):
             if metric.metric_name not in seen:
                 results.append(ResolvedMetric(
                     metric_name=metric.metric_name,
@@ -177,7 +182,9 @@ async def resolve_metrics(
                     ))
                     seen.add(metric.metric_name)
         except Exception:
-            logger.warning("Metrics vector search failed, using keyword results only.", exc_info=True)
+            logger.warning(
+                "Metrics vector search failed, using keyword results only.", exc_info=True
+            )
 
     return results
 

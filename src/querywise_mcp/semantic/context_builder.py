@@ -15,8 +15,6 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = logging.getLogger(__name__)
-
 from querywise_mcp.db.models.schema_cache import CachedRelationship
 from querywise_mcp.semantic.glossary_resolver import (
     ResolvedDictionary,
@@ -33,6 +31,8 @@ from querywise_mcp.semantic.glossary_resolver import (
 from querywise_mcp.semantic.prompt_assembler import assemble_prompt
 from querywise_mcp.semantic.schema_linker import LinkedTable, find_relevant_tables
 from querywise_mcp.services.embedding_service import embed_text
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass

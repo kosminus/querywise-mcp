@@ -1,12 +1,12 @@
 """Agent: SQL Validator — validates generated SQL for safety and correctness."""
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from querywise_mcp.utils.sql_sanitizer import check_sql_safety
 
 
-class ValidationStatus(str, Enum):
+class ValidationStatus(StrEnum):
     VALID = "valid"
     UNSAFE = "unsafe"
     SYNTAX_ERROR = "syntax_error"

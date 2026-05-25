@@ -78,6 +78,13 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B"]
 
+[tool.ruff.lint.per-file-ignores]
+# Prompt templates and the IFRS 9 seed-data dicts are intentional long string
+# literals; reflowing them would hurt readability without any real benefit.
+"src/querywise_mcp/llm/prompts/*.py" = ["E501"]
+"src/querywise_mcp/llm/agents/error_handler.py" = ["E501"]
+"src/querywise_mcp/services/setup_service.py" = ["E501"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

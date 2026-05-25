@@ -27,13 +27,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      # server.py is kept clean; the rest of src/ has pre-existing lint debt
-      # (see CLAUDE.md), so full-tree ruff is informational, not a hard gate.
-      - name: Lint server.py (ruff)
-        run: ruff check src/querywise_mcp/server.py
-
-      - name: Lint full tree (ruff, informational)
-        continue-on-error: true
+      - name: Lint (ruff)
         run: ruff check src/
 
       - name: Byte-compile sanity

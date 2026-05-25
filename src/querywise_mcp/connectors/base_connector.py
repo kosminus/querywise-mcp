@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class ConnectorType(str, Enum):
+class ConnectorType(StrEnum):
     POSTGRESQL = "postgresql"
     SQLITE = "sqlite"
     MYSQL = "mysql"

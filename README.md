@@ -5,7 +5,7 @@ language through a **business semantic layer** — glossary, metric definitions,
 data dictionary, knowledge base, and example queries — grounded against your
 real schema.
 
-It's a refactor of [QueryWise](../querywise) (a full-stack text-to-SQL app) into
+It's a refactor of [QueryWise](https://github.com/kosminus/querywise) (a full-stack text-to-SQL app) into
 a headless tool: no web UI, no Postgres requirement. The metadata store is an
 embedded **SQLite + sqlite-vec** database, so the server runs from a single file.
 

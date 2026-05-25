@@ -74,7 +74,8 @@ src/querywise_mcp/
 ## Commands
 
 ```bash
-ruff check src/            # lint (E501 in setup_service seed data is inherited/expected)
+ruff check src/            # lint — clean and CI-gating (E501 in prompt templates +
+                           #   setup_service seed data is waived via per-file-ignores)
 python -m compileall src/  # byte-compile sanity
 # quick MCP check: spawn `querywise-mcp` over stdio and call list_tools
 ```

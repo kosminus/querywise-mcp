@@ -32,11 +32,11 @@ def get_connector_class(connector_type: str) -> type[BaseConnector]:
     """Get the connector class for a given type string."""
     try:
         ct = ConnectorType(connector_type)
-    except ValueError:
+    except ValueError as err:
         raise ValueError(
             f"Unknown connector type: {connector_type}. "
             f"Available: {[t.value for t in ConnectorType]}"
-        )
+        ) from err
     cls = _CONNECTOR_CLASSES.get(ct)
     if cls is None:
         raise ValueError(f"Connector type '{connector_type}' is not yet implemented.")
